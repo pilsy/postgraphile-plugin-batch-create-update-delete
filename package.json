@@ -40,6 +40,7 @@
     "typescript": "^3.9.6"
   },
   "scripts": {
+    "postinstall": "npx tsc -b",
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "rimraf ./build && npx tsc",
     "format": "npx prettier-standard 'src/*.{ts,tsx}'",
