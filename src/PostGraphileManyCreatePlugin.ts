@@ -1,4 +1,5 @@
 import * as T from './pluginTypes';
+import { pluralize, underscore, camelize } from "inflect";
 import debugFactory from 'debug';
 const debug = debugFactory('graphile-build-pg');
 
@@ -6,7 +7,7 @@ const PostGraphileManyCreatePlugin: T.Plugin = (
   builder: T.SchemaBuilder,
   options: any
 ) => {
-  if (options.pgDisableDefaultMutations) return;
+  // if (options.pgDisableDefaultMutations) return;
 
   /**
    * Add a hook to create the new root level create mutation
@@ -100,20 +101,21 @@ const PostGraphileManyCreatePlugin: T.Plugin = (
         );
         return;
       }
-      const tableTypeName = inflection.tableType(table);
+      const tableTypeName = pluralize(inflection.tableType(table));
 
       // Setup args for the input type
+      const inputTypeName = `Create${tableTypeName}Input`;
       const newInputHookType = GraphQLInputObjectType;
       const newInputHookSpec = {
-        name: `mn${inflection.createInputType(table)}`,
-        description: `All input for the create mn\`${tableTypeName}\` mutation.`,
+        name: inputTypeName,
+        description: `All input for the \`${inputTypeName}\` mutation.`,
         fields: () => ({
           clientMutationId: {
             description:
               'An arbitrary string value with no semantic meaning. Will be included in the payload verbatim. May be used to track mutations by the client.',
             type: GraphQLString
           },
-          [`mn${tableTypeName}`]: {
+          [`${camelize(underscore(tableTypeName), false)}`]: {
             description: `The one or many \`${tableTypeName}\` to be created by this mutation.`,
             type: new GraphQLList(new GraphQLNonNull(TableInput))
           }
@@ -138,10 +140,11 @@ const PostGraphileManyCreatePlugin: T.Plugin = (
       );
 
       // Setup args for payload type
+      const mutationPayloadName = `Create${tableTypeName}Payload`;
       const newPayloadHookType = GraphQLObjectType;
       const newPayloadHookSpec = {
-        name: `mn${inflection.createPayloadType(table)}`,
-        description: `The output of our many create \`${tableTypeName}\` mutation.`,
+        name: mutationPayloadName,
+        description: `The output of our \`${mutationPayloadName}\` mutation.`,
         fields: ({ fieldWithHooks }) => {
           const tableName = inflection.tableFieldName(table);
           return {
@@ -185,8 +188,8 @@ const PostGraphileManyCreatePlugin: T.Plugin = (
         newPayloadHookScope
       );
 
-      const fieldName = `mn${inflection.upperCamelCase(
-        inflection.createField(table)
+      const fieldName = `${underscore(
+        pluralize(inflection.createField(table))
       )}`;
 
       function newFieldWithHooks (): T.FieldWithHooksFunction {
@@ -243,7 +246,9 @@ const PostGraphileManyCreatePlugin: T.Plugin = (
           insertedRowAlias,
           insertedRowAlias,
           resolveData,
-          {},
+          {
+            useAsterisk: false
+          },
           null,
           resolveContext,
           resolveInfo.rootValue
@@ -252,7 +257,8 @@ const PostGraphileManyCreatePlugin: T.Plugin = (
         const sqlColumns: T.SQL[] = [];
         const inputData: Object[] =
           input[
-            `mn${inflection.upperCamelCase(inflection.tableFieldName(table))}`
+            `${camelize(underscore(inflection.tableFieldName(table)), false)}`
+            // `mn${inflection.upperCamelCase(inflection.tableFieldName(table))}`
           ];
         if (!inputData || inputData.length === 0) return null;
         const sqlValues: T.SQL[][] = Array(inputData.length).fill([]);

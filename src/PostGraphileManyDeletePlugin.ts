@@ -1,4 +1,5 @@
 import * as T from './pluginTypes';
+import { pluralize, underscore, camelize } from "inflect";
 import debugFactory from 'debug';
 const debug = debugFactory('graphile-build-pg');
 
@@ -6,7 +7,7 @@ const PostGraphileManyDeletePlugin: T.Plugin = (
   builder: T.SchemaBuilder,
   options: any
 ) => {
-  if (options.pgDisableDefaultMutations) return;
+  // if (options.pgDisableDefaultMutations) return;
 
   /**
    * Add a hook to create the new root level delete mutation
@@ -108,9 +109,10 @@ const PostGraphileManyDeletePlugin: T.Plugin = (
       );
 
       // Setup and add the GraphQL Payload Type
+      const newPayloadName = `Delete${pluralize(tableTypeName)}Payload`;
       const newPayloadHookType = GraphQLObjectType;
       const newPayloadHookSpec = {
-        name: `mn${inflection.deletePayloadType(table)}`,
+        name: newPayloadName,
         description: `The output of our delete mn \`${tableTypeName}\` mutation.`,
         fields: ({ fieldWithHooks }) => {
           const tableName = inflection.tableFieldName(table);
@@ -124,7 +126,7 @@ const PostGraphileManyDeletePlugin: T.Plugin = (
                 type: GraphQLString
               },
 
-              [tableName]: pgField(
+              [`${camelize(underscore(tableName), false)}`]: pgField(
                 build,
                 fieldWithHooks,
                 tableName,
@@ -205,9 +207,7 @@ const PostGraphileManyDeletePlugin: T.Plugin = (
         }
         if (keys.some(key => omit(key, 'read'))) return;
 
-        const fieldName = `mn${inflection.upperCamelCase(
-          inflection.deleteByKeys(keys, table, constraint)
-        )}`;
+        const fieldName = `delete_${underscore(pluralize(table.name))}`;
 
         const newInputHookType = GraphQLInputObjectType;
 
@@ -216,7 +216,7 @@ const PostGraphileManyDeletePlugin: T.Plugin = (
         );
 
         const newInputHookSpec = {
-          name: `mn${inflection.upperCamelCase(
+          name: `${inflection.upperCamelCase(
             inflection.deleteByKeysInputType(keys, table, constraint)
           )}`,
           description: `All input for the delete \`${fieldName}\` mutation.`,
@@ -227,7 +227,7 @@ const PostGraphileManyDeletePlugin: T.Plugin = (
               }
             },
             {
-              [`mn${inflection.upperCamelCase(patchName)}`]: {
+              [`${pluralize(inflection.camelCase(patchName))}`]: {
                 description: `The one or many \`${tableTypeName}\` to be deleted. You must provide the PK values!`,
                 // TODO: Add an actual type that has the PKs required
                 // instead of using the tablePatch in another file,
@@ -394,7 +394,9 @@ const PostGraphileManyDeletePlugin: T.Plugin = (
             modifiedRowAlias,
             modifiedRowAlias,
             resolveData,
-            {},
+            {
+              useAsterisk: false
+            },
             null,
             resolveContext,
             resolveInfo.rootValue

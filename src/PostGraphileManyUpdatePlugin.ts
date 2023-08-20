@@ -1,4 +1,5 @@
 import * as T from './pluginTypes';
+import { pluralize, underscore, camelize } from "inflect";
 import debugFactory from 'debug';
 const debug = debugFactory('graphile-build-pg');
 
@@ -6,7 +7,7 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
   builder: T.SchemaBuilder,
   options: any
 ) => {
-  if (options.pgDisableDefaultMutations) return;
+  // if (options.pgDisableDefaultMutations) return;
 
   /**
    * Add a hook to create the new root level create mutation
@@ -108,9 +109,10 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
       );
 
       // Setup and add the GraphQL Payload type
+      const newPayloadName = `${pluralize(tableTypeName)}Patch`;
       const newPayloadHookType = GraphQLObjectType;
       const newPayloadHookSpec = {
-        name: `mn${inflection.updatePayloadType(table)}`,
+        name: newPayloadName,
         description: `The output of our update mn \`${tableTypeName}\` mutation.`,
         fields: ({ fieldWithHooks }) => {
           const tableName = inflection.tableFieldName(table);
@@ -121,7 +123,7 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
                  unchanged and unused. May be used by a client to track mutations.',
               type: GraphQLString
             },
-            [tableName]: pgField(
+            [`${camelize(underscore(tableName), false)}`]: pgField(
               build,
               fieldWithHooks,
               tableName,
@@ -172,9 +174,7 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
         }
         if (keys.some(key => omit(key, 'read'))) return;
 
-        const fieldName = `mn${inflection.upperCamelCase(
-          inflection.updateByKeys(keys, table, constraint)
-        )}`;
+        const fieldName = `update_${underscore(pluralize(table.name))}`;
 
         const newInputHookType = GraphQLInputObjectType;
 
@@ -183,7 +183,7 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
         );
 
         const newInputHookSpec = {
-          name: `mn${inflection.upperCamelCase(
+          name: `${inflection.upperCamelCase(
             inflection.updateByKeysInputType(keys, table, constraint)
           )}`,
           description: `All input for the update \`${fieldName}\` mutation.`,
@@ -194,7 +194,7 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
               }
             },
             {
-              [`mn${inflection.upperCamelCase(patchName)}`]: {
+              [`${pluralize(inflection.camelCase(patchName))}`]: {
                 description: `The one or many \`${tableTypeName}\` to be updated.`,
                 // TODO: Add an actual type that has the PKs required
                 // instead of using the tablePatch in another file,
@@ -290,9 +290,10 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
           const allSQLColumns: T.SQL[] = [];
           const inputData: Object[] =
             input[
-              `mn${inflection.upperCamelCase(
-                inflection.patchField(inflection.tableFieldName(table))
-              )}`
+              `${pluralize(inflection.camelCase(patchName))}`
+              // `${inflection.camelCase(
+              //   inflection.patchField(inflection.tableFieldName(table))
+              // )}`
             ];
           if (!inputData || inputData.length === 0) return null;
           const sqlValues: T.SQL[][] = Array(inputData.length).fill([]);
@@ -411,7 +412,9 @@ const PostGraphileManyUpdatePlugin: T.Plugin = (
             modifiedRowAlias,
             modifiedRowAlias,
             resolveData,
-            {},
+            {
+              useAsterisk: false
+            },
             null,
             resolveContext,
             resolveInfo.rootValue
